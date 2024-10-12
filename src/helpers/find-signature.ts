@@ -23,8 +23,13 @@ export function findNewSignature(
     case 'Prisma.JsonValue':
     case 'InputJsonValue':
     case 'InputJsonValue | InputJsonValue':
+    case 'InputJsonValue | null':
     case 'JsonNullValueInput | InputJsonValue':
+    case 'NullableJsonNullValueInput | InputJsonValue':
       return typeToChange;
+  
+    case 'NullableJsonFieldUpdateOperationsInput':
+      return `${typeToChange} | null`;
 
     // Super complex type that strictly typing will lose functionality
     case `JsonWithAggregatesFilter<"${model}">`:

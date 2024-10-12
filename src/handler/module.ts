@@ -8,44 +8,42 @@ import { handleStatement } from './statement';
 
 /** Handles the prisma namespace module recursively. */
 export function handlePrismaModule(
-  child: ts.ModuleDeclaration,
+  node: ts.ModuleDeclaration,
   writer: DeclarationWriter,
   models: PrismaEntity[],
   config: PrismaJsonTypesGeneratorConfig
 ) {
-  const name = child.name && (child.name as ts.Identifier).text;
+  const name = node.name && (node.name as ts.Identifier).text;
 
   // Not a Prisma namespace
-  if (!name || ![PRISMA_NAMESPACE_NAME, 'Prisma'].includes(name)) {
+  if (!name || name !== PRISMA_NAMESPACE_NAME) {
     return;
   }
 
-  const content = child.body as ts.ModuleBlock | ts.NamespaceDeclaration;
+  let body = node.body;
 
-  if (!content) {
+  if (!body) {
     throw new PrismaJsonTypesGeneratorError('Prisma namespace content could not be found');
   }
 
-  if (content.kind === ts.SyntaxKind.ModuleBlock) {
-    for (const statement of content.statements) {
-      try {
-        if (statement.kind === ts.SyntaxKind.ModuleDeclaration) {
-          handlePrismaModule(statement as ts.ModuleDeclaration, writer, models, config);
-        } else {
+  // Recursively process the module body
+  if (ts.isModuleBlock(body)) {
+    for (const statement of body.statements) {
+      if (ts.isModuleDeclaration(statement)) {
+        handlePrismaModule(statement, writer, models, config);
+      } else {
+        try {
           handleStatement(statement, writer, models, config);
+        } catch (error) {
+          if (error instanceof PrismaJsonTypesGeneratorError) {
+            PrismaJsonTypesGeneratorError.handler(error);
+          } else {
+            throw error;
+          }
         }
-      } catch (error) {
-        // This allows some types to be generated even if others may fail
-        // which is good for incremental development/testing
-        if (error instanceof PrismaJsonTypesGeneratorError) {
-          return PrismaJsonTypesGeneratorError.handler(error);
-        }
-
-        // Stops this generator is error thrown is not manually added by our code.
-        throw error;
       }
     }
-  } else if (content.kind === ts.SyntaxKind.ModuleDeclaration) {
-    handlePrismaModule(content as ts.ModuleDeclaration, writer, models, config);
+  } else if (ts.isModuleDeclaration(body)) {
+    handlePrismaModule(body, writer, models, config);
   }
 }

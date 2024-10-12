@@ -6,6 +6,8 @@ import { parseConfig } from './util/config';
 import { DeclarationWriter } from './util/declaration-writer';
 import { findPrismaClientGenerator } from './util/prisma-generator';
 import { buildTypesFilePath } from './util/source-path';
+import { handleStatement } from './handler/statement';
+import { PrismaJsonTypesGeneratorError } from './util/error';
 
 /** Runs the generator with the given options. */
 export async function onGenerate(options: GeneratorOptions) {
@@ -35,17 +37,27 @@ export async function onGenerate(options: GeneratorOptions) {
 
     const prismaModels = extractPrismaModels(options.dmmf);
 
-   // Recursively handles the Prisma namespace.
-   function processNode(node: ts.Node) {
-    if (ts.isModuleDeclaration(node)) {
-      handlePrismaModule(node, writer, prismaModels, config);
+    // Recursively handles the Prisma namespace.
+    function processNode(node: ts.Node) {
+      if (ts.isModuleDeclaration(node)) {
+        handlePrismaModule(node, writer, prismaModels, config);
+      } else if (ts.isStatement(node)) {
+        try {
+          handleStatement(node, writer, prismaModels, config);
+        } catch (error) {
+          if (error instanceof PrismaJsonTypesGeneratorError) {
+            PrismaJsonTypesGeneratorError.handler(error);
+          } else {
+            throw error;
+          }
+        }
+      }
+      ts.forEachChild(node, processNode);
     }
-    ts.forEachChild(node, processNode);
-  }
 
-  processNode(tsSource);
+    processNode(tsSource);
 
-  await writer.save();
+    await writer.save();
   } catch (error) {
     console.error(error);
   }
