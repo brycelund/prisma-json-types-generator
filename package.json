@@ -19,6 +19,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "prepare": "npm run build",
     "dev": "tsc -w",
     "format": "biome format --write .",
     "lint": "biome check .",
