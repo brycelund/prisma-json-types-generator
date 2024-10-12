@@ -35,18 +35,17 @@ export async function onGenerate(options: GeneratorOptions) {
 
     const prismaModels = extractPrismaModels(options.dmmf);
 
-    // Handles the prisma namespace.
-    tsSource.forEachChild((child) => {
-      try {
-        if (child.kind === ts.SyntaxKind.ModuleDeclaration) {
-          handlePrismaModule(child as ts.ModuleDeclaration, writer, prismaModels, config);
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    });
+   // Recursively handles the Prisma namespace.
+   function processNode(node: ts.Node) {
+    if (ts.isModuleDeclaration(node)) {
+      handlePrismaModule(node, writer, prismaModels, config);
+    }
+    ts.forEachChild(node, processNode);
+  }
 
-    await writer.save();
+  processNode(tsSource);
+
+  await writer.save();
   } catch (error) {
     console.error(error);
   }
